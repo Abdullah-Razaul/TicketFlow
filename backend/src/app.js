@@ -50,6 +50,14 @@ app.get('/api/events',asyncRoute(async(req,res)=>{
   const [items,total]=await Promise.all([prisma.event.findMany({where,skip:(page-1)*limit,take:limit,orderBy:{startsAt:'asc'},include:{categories:true,_count:{select:{seats:true}}}}),prisma.event.count({where})]);
   res.json({items,total,page,pages:Math.ceil(total/limit)});
 }));
+app.get('/api/events/mine', authenticate, authorize('ORGANIZER'), asyncRoute(async (req, res) => {
+  const items = await prisma.event.findMany({
+    where: { organizerId: req.user.id },
+    orderBy: { startsAt: 'asc' },
+    include: { categories: true }
+  });
+  res.json(items);
+}));
 app.get('/api/events/:id',asyncRoute(async(req,res)=>{
  const event=await prisma.event.findUnique({where:{id:req.params.id},include:{categories:true,seats:{orderBy:[{rowLabel:'asc'},{seatNumber:'asc'}]}}}); if(!event) throw bad('Event not found',404);
  await expireSeats(event.id); const fresh=await prisma.event.findUnique({where:{id:event.id},include:{categories:true,seats:{orderBy:[{rowLabel:'asc'},{seatNumber:'asc'}]}}}); res.json(fresh);
