@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ORGANIZER
+  CUSTOMER
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+}
+
+enum BookingStatus {
+  HELD
+  PENDING_PAYMENT
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+  events       Event[]  @relation("OrganizerEvents")
+  bookings     Booking[]
+  notifications Notification[]
+}
+
+model Event {
+  id              String         @id @default(uuid())
+  organizerId     String
+  organizer       User           @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  name            String
+  description     String?
+  city            String
+  venue           String
+  startsAt        DateTime
+  rows            Int
+  seatsPerRow     Int
+  pricingStrategy String         @default("BASE")
+  createdAt       DateTime       @default(now())
+  seats           Seat[]
+  categories      SeatCategory[]
+  bookings        Booking[]
+  @@index([city, startsAt])
+}
+
+model SeatCategory {
+  id        String  @id @default(uuid())
+  eventId   String
+  name      String
+  basePrice Decimal @db.Decimal(10, 2)
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seats     Seat[]
+}
+
+model Seat {
+  id            String      @id @default(uuid())
+  eventId       String
+  rowLabel      String
+  seatNumber    Int
+  categoryId    String?
+  status        SeatStatus  @default(AVAILABLE)
+  holdExpiresAt DateTime?
+  holdToken     String?
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category      SeatCategory? @relation(fields: [categoryId], references: [id])
+  bookingSeat   BookingSeat?
+  @@unique([eventId, rowLabel, seatNumber])
+  @@index([eventId, status, holdExpiresAt])
+}
+
+model Booking {
+  id             String                @id @default(uuid())
+  userId         String
+  eventId        String
+  status         BookingStatus         @default(HELD)
+  total          Decimal               @db.Decimal(10, 2)
+  idempotencyKey String                @unique
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  user           User                  @relation(fields: [userId], references: [id])
+  event          Event                 @relation(fields: [eventId], references: [id])
+  seats          BookingSeat[]
+  history        BookingStatusHistory[]
+  payments       Payment[]
+}
+
+model BookingSeat {
+  id        String  @id @default(uuid())
+  bookingId String
+  seatId    String  @unique
+  price     Decimal @db.Decimal(10, 2)
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seat      Seat    @relation(fields: [seatId], references: [id])
+  @@unique([bookingId, seatId])
+}
+
+model BookingStatusHistory {
+  id         String        @id @default(uuid())
+  bookingId  String
+  fromStatus BookingStatus?
+  toStatus   BookingStatus
+  changedAt  DateTime      @default(now())
+  note       String?
+  booking    Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  bookingId         String
+  provider          String
+  providerReference String?
+  idempotencyKey    String   @unique
+  amount            Decimal  @db.Decimal(10, 2)
+  status            String
+  createdAt         DateTime @default(now())
+  booking           Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  channel   String
+  type      String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

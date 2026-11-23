@@ -1,0 +1,1 @@
+export function calculatePrice(basePrice,strategy='BASE',startsAt=new Date()){ if(strategy==='EARLY_BIRD' && new Date(startsAt)-Date.now()>7*86400000) return Math.round(basePrice*0.8*100)/100; return Math.round(basePrice*100)/100; }
