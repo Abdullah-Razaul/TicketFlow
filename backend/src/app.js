@@ -19,7 +19,16 @@ import { MockWalletProvider } from './payments/MockWalletProvider.js';
 
 export const app = express();
 app.use(helmet());
-app.use(cors({ origin: env.CLIENT_ORIGIN.split(',') }));
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowed = env.CLIENT_ORIGIN.split(',');
+    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 app.get('/api/health', (_req,res)=>res.json({status:'ok',service:'ticketflow-api'}));
